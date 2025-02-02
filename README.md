@@ -7,12 +7,14 @@ An R package to process environmental DNA (eDNA) data and format it for submissi
 You can install this package from GitHub:
 ```r
 install.packages("devtools")
+
 devtools::install_github("ksawatzki/PristineDNA")
 ```
 
 ## Usage
 ```r
 library(PristineDNA)
+
 PristineDNA(metadata = "metadata.xlsx", eflow = "eDNA_data.tsv", seq = "sequences.fasta")
 ```
 

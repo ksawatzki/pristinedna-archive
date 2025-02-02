@@ -19,15 +19,11 @@ PristineDNA(metadata = "metadata.xlsx", eflow = "eDNA_data.tsv", seq = "sequence
 ```
 
 ## Input
-metadata are Excel spreadsheets with two sheets ...
-
-eflow are standard tsv file output of eFlow pipeline
-
+metadata are Excel spreadsheets with two sheets ...</br>
+eflow are standard tsv file output of eFlow pipeline</br>
 seq are currently optional, expectation is a FASTA file with ZOTU sample names
 
 ## Output
-Program currently outputs a zipped DwC-a format file that is directly submittable to OBIS and GBIF
-
-It also writes the four files in this zip for easy viewing. These are the occurrence file, the DNA extension, eml and meta files.
-
+Program currently outputs a zipped DwC-a format file that is directly submittable to OBIS and GBIF</br>
+It also writes the four files in this zip for easy viewing. These are the occurrence file, the DNA extension, eml and meta files.</br>
 Future output will be the associated FASTA file with modified titles to include metadata. This output will be made for direct submission to GenBank or other repositories.

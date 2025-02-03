@@ -1,6 +1,6 @@
 # PristineDNA
 
-An R package to process environmental DNA (eDNA) data and format it for submission to OBIS and GBIF. This package is intended to conform to Pristine Seas standard metadata (and output files and is not directly applicable to all input formats.
+An R package to process environmental DNA (eDNA) data and format it for submission to OBIS and GBIF. This package is intended to conform to Pristine Seas standard metadata and output files and is not directly applicable to all input formats.
 
 ## Installation
 

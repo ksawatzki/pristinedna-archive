@@ -1,23 +1,39 @@
 # Helpers (not exported)
 
-# function to convert latitude and longitude to decimal degrees
-convert_to_decimal <- function(coord) {
-  if (is.na(coord) | coord == "") return(NA)
-  coord <- gsub("[°]", " ", coord)
-  coord <- gsub("[’']", " ", coord)
-  coord <- gsub('["]', " ", coord)
-  parts <- unlist(strsplit(trimws(coord), "\\s+"))
-  direction <- parts[length(parts)]
-  numeric_parts <- as.numeric(parts[1:(length(parts) - 1)])
-  decimal <- numeric_parts[1] + 
-    (ifelse(length(numeric_parts) > 1, numeric_parts[2] / 60, 0)) +
-    (ifelse(length(numeric_parts) > 2, numeric_parts[3] / 3600, 0))
-  if (direction %in% c("S", "W")) {
-    decimal <- -decimal
-  }
-  return(decimal)
+# function to convert latitude and longitude to decimal degrees flexibly
+convert_to_decimal <- function(x) {
+  vapply(x, FUN.VALUE = numeric(1), function(coord) {
+    if (is.null(coord) || is.na(coord) || coord == "") return(NA_real_)
+    coord <- trimws(as.character(coord))
+    dec_try <- suppressWarnings(as.numeric(coord))
+    if (!is.na(dec_try)) return(dec_try)
+    up <- toupper(coord)
+    dir_match <- regmatches(up, regexpr("[NSEW](?!.*[NSEW])", up, perl = TRUE))
+    has_dir <- length(dir_match) == 1
+    dir <- if (has_dir) dir_match else NA_character_
+    norm <- coord
+    norm <- gsub("[°º∘]", " ", norm)     # degrees
+    norm <- gsub("[′’ʹ']", " ", norm)    # minutes
+    norm <- gsub("[″\"ʺ]", " ", norm)    # seconds
+    norm <- gsub(",", " ", norm)
+    norm <- gsub("[A-Za-z]", " ", norm)
+    norm <- gsub("\\s+", " ", norm)
+    parts <- strsplit(trimws(norm), " ", fixed = FALSE)[[1]]
+    nums  <- suppressWarnings(as.numeric(parts))
+    nums  <- nums[!is.na(nums)]
+    if (length(nums) == 0) return(NA_real_)
+    deg <- nums[1]
+    min <- if (length(nums) >= 2) nums[2] else 0
+    sec <- if (length(nums) >= 3) nums[3] else 0
+    dec <- abs(deg) + min/60 + sec/3600
+    sgn <- if (deg < 0) -1 else 1
+    if (has_dir) {
+      if (dir %in% c("S", "W")) sgn <- -1
+      if (dir %in% c("N", "E")) sgn <-  1
+    }
+    sgn * dec
+  })
 }
-
 # function to parse and format any date input into ISO8601
 format_to_iso8601 <- function(date_input) {
   parsed_date <- as.Date(lubridate::parse_date_time(date_input, orders = c("ymd", "mdy", "dmy", "ydm")))
@@ -62,23 +78,23 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
   # read in Excel file (metadata and labwork sheets)
   metadata_df <- readxl::read_excel(metadata, sheet = "metadata")
   labwork_df <- readxl::read_excel(metadata, sheet = "labwork")
-
+  
   # read in TSV file (eFlow output)
   edna_data <- utils::read.delim(eflow, na = c("NA", "dropped"), header = TRUE)
-
+  
   ###### Start pre-processing QC and conversion steps
-
+  
   # QC check for missing ps_sample_id values
   missing_metadata <- dplyr::filter(metadata_df, is.na(ps_sample_id) | ps_sample_id == "" | ps_sample_id == 0)
   missing_labwork <- dplyr::filter(labwork_df, is.na(ps_sample_id) | ps_sample_id == "" | ps_sample_id == 0)
-
+  
   if (nrow(missing_metadata) > 0) {
     message(paste(nrow(missing_metadata), "rows have missing ps_sample_id values in the 'metadata' sheet."))
   }
   if (nrow(missing_labwork) > 0) {
     message(paste(nrow(missing_labwork), "rows have missing ps_sample_id values in the 'labwork' sheet."))
   }
-
+  
   missing_count <- nrow(missing_metadata) + nrow(missing_labwork)
   if (missing_count > 0) {
     repeat {
@@ -90,7 +106,7 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       if (user_choice %in% c("1", "2", "3")) break
       message("Invalid option. Please enter 1, 2, or 3.")
     }
-
+    
     if (user_choice == "3") {
       stop("Good luck!")
     } else if (user_choice == "2") {
@@ -127,18 +143,18 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       labwork_df <- dplyr::filter(labwork_df, !is.na(ps_sample_id) & ps_sample_id != "" & ps_sample_id != 0)
     }
   }
-
+  
   # convert lat/long to decimal degrees
   metadata_df$lat  <- sapply(metadata_df$lat,  convert_to_decimal)
   metadata_df$long <- sapply(metadata_df$long, convert_to_decimal)
-
+  
   # convert dates to ISO 8601
   metadata_df$date               <- sapply(metadata_df$date, format_to_iso8601)
   labwork_df$`Extraction Date`   <- sapply(labwork_df$`Extraction Date`, format_to_iso8601)
-
+  
   # QC Check for pid values <90 and user choice to drop
   low_pid_rows <- dplyr::filter(edna_data, pid < 90)
-
+  
   if (nrow(low_pid_rows) > 0) {
     repeat {
       cat("Percent identity values <90% have been found in the eFlow input.\n")
@@ -148,7 +164,7 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       cat("3 - Decide for each instance\n")
       cat("4 - Quit program to investigate\n")
       user_choice <- readline("Enter option (1/2/3/4): ")
-
+      
       if (user_choice == "1") {
         break
       } else if (user_choice == "2") {
@@ -179,7 +195,7 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       }
     }
   }
-
+  
   # QC for missing taxonomy (fatal for OBIS/GBIF)
   taxonomic_cols <- c("domain","kingdom","phylum","class","order","family","genus","species")
   missing_taxa_rows <- dplyr::filter(edna_data, dplyr::if_all(dplyr::all_of(taxonomic_cols), ~ is.na(.) | . == "" | . == "0" | . == "dropped"))
@@ -191,7 +207,7 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
     message(paste(nrow(removed_rows), "rows have been removed due to missing taxonomic information. This has been written to removed_eFlow_rows.csv"))
     utils::write.csv(removed_rows, file = "removed_eFlow_rows.csv", row.names = FALSE)
   }
-
+  
   # Reshape eFlow: melt counts for ps_sample_id columns present in metadata
   ps_sample_id_cols <- which(colnames(edna_data) %in% metadata_df$ps_sample_id)
   if (length(ps_sample_id_cols) > 0) {
@@ -202,23 +218,23 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
   } else {
     stop("No matching ps_sample_id columns found in edna_data")
   }
-
+  
   if (!"ps_sample_id" %in% colnames(edna_data)) {
     stop("Error: ps_sample_id column is missing after melting.")
   }
-
+  
   # Enforce intersection across three inputs
   common_ps_sample_ids <- Reduce(intersect, list(metadata_df$ps_sample_id, labwork_df$ps_sample_id, edna_data$ps_sample_id))
   missing_metadata <- setdiff(metadata_df$ps_sample_id, common_ps_sample_ids)
   missing_labwork  <- setdiff(labwork_df$ps_sample_id,  common_ps_sample_ids)
   missing_edna     <- setdiff(edna_data$ps_sample_id,   common_ps_sample_ids)
   total_missing    <- length(missing_metadata) + length(missing_labwork) + length(missing_edna)
-
+  
   if (total_missing > 0) {
     message(paste(length(missing_metadata), "missing samples present in metadata."))
     message(paste(length(missing_labwork),  "missing samples present in labwork."))
     message(paste(length(missing_edna),     "missing samples present in eDNA data."))
-
+    
     repeat {
       user_choice <- readline(paste("Options:\n",
                                     "1 - Remove samples missing from any dataset and continue\n",
@@ -228,9 +244,9 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       if (user_choice %in% c("1", "2", "3")) break
       message("Invalid option. Please enter 1, 2, or 3.")
     }
-
+    
     if (user_choice == "3") stop("Good luck!")
-
+    
     if (user_choice == "2") {
       message("Reviewing missing samples by dataset:")
       if (length(missing_metadata) > 0) {
@@ -247,23 +263,23 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       }
       if (final_choice == "2") stop("Good luck!")
     }
-
+    
     metadata_df <- dplyr::filter(metadata_df, ps_sample_id %in% common_ps_sample_ids)
     labwork_df  <- dplyr::filter(labwork_df,  ps_sample_id %in% common_ps_sample_ids)
     edna_data   <- dplyr::filter(edna_data,   ps_sample_id %in% common_ps_sample_ids)
   }
-
+  
   # Merge
   merged_data <- dplyr::inner_join(metadata_df, labwork_df, by = "ps_sample_id") %>%
-                 dplyr::inner_join(edna_data,   by = "ps_sample_id")
-
+    dplyr::inner_join(edna_data,   by = "ps_sample_id")
+  
   # Optional FASTA
   if (!is.null(seq)) {
     dna_sequences <- Biostrings::readDNAStringSet(seq)
   }
-
+  
   ###### Map to DwC terms
-
+  
   occurrence_df <- dplyr::transmute(
     merged_data,
     occurrenceID = paste(ps_sample_id, OTU, sep = "_"),
@@ -333,7 +349,7 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
     taxonRank = names(which.max(!is.na(c(domain, kingdom, phylum, class, order, family, genus, specificEpithet)))),
     taxonID = taxid
   )
-
+  
   dnaderiveddata_df <- dplyr::transmute(
     merged_data,
     source_mat_id = paste0(ps_sample_id, "_", OTU),
@@ -358,7 +374,7 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
     pcr_primers = paste0("FWD:",`F-Primer`,";REV:",`R-Primer`),
     DNA_sequence = sequence
   )
-
+  
   # QC via obistools/Hmisc
   if (qc) {
     message("\n=== Running QC checks with obistools and Hmisc ===")
@@ -366,16 +382,16 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
     if (!requireNamespace("Hmisc", quietly = TRUE))     stop("Package 'Hmisc' is required for QC but not installed.")
     suppressWarnings(library(obistools))
     suppressWarnings(library(Hmisc))
-
+    
     message("\n-- OBIS Field Checks --")
     fields_check <- obistools::check_fields(occurrence_df)
     event_check  <- tryCatch(obistools:::check_eventdate(occurrence_df), error = function(e) data.frame())
     coord_check  <- tryCatch(obistools:::check_coordinates(occurrence_df), error = function(e) data.frame())
-
+    
     message(paste("-", nrow(fields_check), "rows with invalid DwC fields"))
     message(paste("-", nrow(event_check),  "rows with problematic eventDate"))
     message(paste("-", nrow(coord_check),  "rows with invalid coordinates"))
-
+    
     if (nrow(coord_check) > 0) {
       utils::write.csv(coord_check, "bad_coordinates.csv", row.names = FALSE)
       message("→ Saved bad coordinates to 'bad_coordinates.csv'")
@@ -388,18 +404,18 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       utils::write.csv(fields_check, "bad_fields.csv", row.names = FALSE)
       message("→ Saved invalid DwC field rows to 'bad_fields.csv'")
     }
-
+    
     message("\n-- Hmisc Variable Summaries --")
     sink("qc_summary_occurrence.txt"); print(Hmisc::describe(occurrence_df)); sink()
     message("→ Variable summary for occurrence_df written to 'qc_summary_occurrence.txt'")
     sink("qc_summary_dnaderiveddata.txt"); print(Hmisc::describe(dnaderiveddata_df)); sink()
     message("→ Variable summary for dnaderiveddata_df written to 'qc_summary_dnaderiveddata.txt'")
   }
-
+  
   # Write outputs
   readr::write_tsv(occurrence_df, "occurrence.txt", na = "")
   readr::write_tsv(dnaderiveddata_df, "dnaderiveddata.txt", na = "")
-
+  
   # Build EML
   eml_doc <- XML::newXMLNode("eml:eml", namespaceDefinitions = c("eml" = "eml://ecoinformatics.org/eml-2.1.1"))
   dataset <- XML::newXMLNode("dataset", parent = eml_doc)
@@ -411,7 +427,7 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
   XML::newXMLNode("individualName", metadata_df$team_lead[1], parent = associated_party)
   XML::newXMLNode("organizationName", "Pristine Seas", parent = associated_party)
   XML::saveXML(eml_doc, file = "eml.xml")
-
+  
   # Build meta.xml
   meta_doc <- XML::newXMLNode("archive",
                               namespaceDefinitions = c("dwc" = "http://rs.tdwg.org/dwc/text/"),
@@ -424,16 +440,16 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
   XML::newXMLNode("id", attrs = c("index" = "0"), parent = core)
   for (i in seq_along(colnames(occurrence_df))) {
     XML::newXMLNode("field", attrs = c("index" = as.character(i),
-      "term" = paste0("http://rs.tdwg.org/dwc/terms/", colnames(occurrence_df)[i])), parent = core)
+                                       "term" = paste0("http://rs.tdwg.org/dwc/terms/", colnames(occurrence_df)[i])), parent = core)
   }
-
+  
   extension <- XML::newXMLNode("extension", parent = meta_doc,
                                attrs = c("encoding"="UTF-8","fieldsTerminatedBy"="\t","linesTerminatedBy"="\n",
                                          "fieldsEnclosedBy"="","ignoreHeaderLines"="1",
                                          "rowType"="http://rs.gbif.org/terms/1.0/DNADerivedData"))
   XML::newXMLNode("files", XML::newXMLNode("location", "dnaderiveddata.txt"), parent = extension)
   XML::newXMLNode("coreid", attrs = c("index" = "0"), parent = extension)
-
+  
   mixs_terms <- list("source_mat_id"="0000026","project_name"="0000092","env_broad_scale"="0000012",
                      "env_medium"="0000014","lib_layout"="0000041","target_gene"="0000044","target_subfragment"="0000045",
                      "seq_meth"="0000050","pcr_cond"="0000049","pcr_primers"="0000046")
@@ -446,20 +462,20 @@ pristinedna <- function(metadata, eflow, seq = NULL, qc = TRUE) {
       XML::newXMLNode("field", attrs = c("index" = as.character(i), "term" = term_url), parent = extension)
     }
   }
-
+  
   XML::saveXML(meta_doc, file = "meta.xml")
-
+  
   # Zip
   output_zip <- file.path(getwd(), "dwca_output.zip")
   files_to_zip <- c("occurrence.txt","dnaderiveddata.txt","meta.xml","eml.xml")
   files_to_zip <- files_to_zip[file.exists(files_to_zip)]
   zip::zipr(zipfile = output_zip, files = files_to_zip)
-
+  
   if (file.exists(output_zip)) {
     message(paste("DwC-A file successfully created at", output_zip))
   } else {
     stop("Error: Failed to create DwC-A file")
   }
-
+  
   invisible(list(occurrence_df = occurrence_df, dnaderiveddata_df = dnaderiveddata_df))
 }

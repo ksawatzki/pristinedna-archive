@@ -31,31 +31,53 @@ pristinesra <- function(metadata, outdir = "sra_out", fastq_manifest = NULL) {
   if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
   
   ## ---------- helpers (vectorized) ----------
-  convert_to_decimal <- function(coord) {
-    if (is.na(coord) || coord == "") return(NA_real_)
-    coord <- gsub("°", "", as.character(coord))
-    coord <- trimws(coord)
-    parts <- strsplit(coord, "\\s+")[[1]]
-    if (length(parts) == 1L) return(suppressWarnings(as.numeric(parts[1])))
-    val <- suppressWarnings(as.numeric(parts[1]))
-    dir <- toupper(parts[2])
-    if (dir %in% c("S","W")) val <- -val
-    val
+  convert_to_decimal <- function(x) {
+    vapply(x, FUN.VALUE = numeric(1), function(coord) {
+      if (is.null(coord) || is.na(coord) || coord == "") return(NA_real_)
+      coord <- trimws(as.character(coord))
+      dec_try <- suppressWarnings(as.numeric(coord))
+      if (!is.na(dec_try)) return(dec_try)
+      up <- toupper(coord)
+      dir_match <- regmatches(up, regexpr("[NSEW](?!.*[NSEW])", up, perl = TRUE))
+      has_dir <- length(dir_match) == 1
+      dir <- if (has_dir) dir_match else NA_character_
+      norm <- coord
+      norm <- gsub("[°º∘]", " ", norm)     # degrees
+      norm <- gsub("[′’ʹ']", " ", norm)    # minutes
+      norm <- gsub("[″\"ʺ]", " ", norm)    # seconds
+      norm <- gsub(",", " ", norm)
+      norm <- gsub("[A-Za-z]", " ", norm)
+      norm <- gsub("\\s+", " ", norm)
+      parts <- strsplit(trimws(norm), " ", fixed = FALSE)[[1]]
+      nums  <- suppressWarnings(as.numeric(parts))
+      nums  <- nums[!is.na(nums)]
+      if (length(nums) == 0) return(NA_real_)
+      deg <- nums[1]
+      min <- if (length(nums) >= 2) nums[2] else 0
+      sec <- if (length(nums) >= 3) nums[3] else 0
+      dec <- abs(deg) + min/60 + sec/3600
+      sgn <- if (deg < 0) -1 else 1
+      if (has_dir) {
+        if (dir %in% c("S", "W")) sgn <- -1
+        if (dir %in% c("N", "E")) sgn <-  1
+      }
+      sgn * dec
+    })
   }
   format_date <- function(x) {
     parsed <- suppressWarnings(lubridate::parse_date_time(x, orders = c("ymd","mdy","dmy","ydm")))
     as.character(as.Date(parsed))
   }
   format_latlon <- function(lat, lon) {
-    lat <- suppressWarnings(as.numeric(lat))
-    lon <- suppressWarnings(as.numeric(lon))
-    out <- rep("", length(lat))
-    ok  <- is.finite(lat) & is.finite(lon)
+    lat_num <- suppressWarnings(as.numeric(lat))
+    lon_num <- suppressWarnings(as.numeric(lon))
+    out <- rep("", length(lat_num))
+    ok  <- is.finite(lat_num) & is.finite(lon_num) &
+      lat_num >= -90 & lat_num <= 90 & lon_num >= -180 & lon_num <= 180
     if (any(ok)) {
-      out[ok] <- paste0(
-        abs(round(lat[ok], 5)), ifelse(lat[ok] < 0, " S", " N"), " ",
-        abs(round(lon[ok], 5)), ifelse(lon[ok] < 0, " W", " E")
-      )
+      lat_str <- formatC(lat_num[ok], format = "f", digits = 8, drop0trailing = TRUE)
+      lon_str <- formatC(lon_num[ok], format = "f", digits = 8, drop0trailing = TRUE)
+      out[ok] <- paste(lat_str, lon_str)
     }
     out
   }

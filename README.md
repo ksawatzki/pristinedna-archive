@@ -32,24 +32,20 @@ library(PristineDNA)
 
 # OBIS/GBIF (DwC-A)
 pristinedna(
-  metadata = "metadata.xlsx",      # Excel workbook with 2 sheets (see below)
-  eflow    = "eDNA_data.tsv",      # TSV from your eDNA pipeline (long format)
-  seq      = "sequences.fasta",    # optional FASTA with ZOTU/ASV IDs in headers
-  outdir   = "dwca_out",           # optional; default = working directory
-  archive  = "project_dwca.zip"    # optional; default = auto-named
+  metadata = "metadata.xlsx",      # Lab spreadsheet with metadata and library prep records
+  eflow    = "eDNA_data.tsv",      # TSV from your eDNA pipeline
+  seq      = "sequences.fasta",    # optional FASTA with sample IDs in headers
+  qc       = TRUE,                 # optional QC with screen and printed output
 )
 
 # NCBI SRA spreadsheets
 pristinesra(
   metadata       = "metadata.xlsx",         # Lab spreadsheet with metadata and library prep records
-  outdir         = "sra_out",               # where TSVs/XML are written
-  platform       = "ILLUMINA",              # e.g., ILLUMINA, OXFORD_NANOPORE, PACBIO_SMRT
-  library_prep   = list(strategy="AMPLICON", selection="PCR", layout="PAIRED"),
-  validate       = TRUE
+  outdir         = "sra_out",               # where TSVs are written
 )
 
-pristinedna(metadata = "metadata.xlsx", eflow = "eDNA_output.tsv", seq = "seqs.fasta")
-pristinesra(metadata = "metadata.xlsx", fastq_manifest = man, outdir = tempdir())
+pristinedna(metadata = "metadata.xlsx", eflow = "eDNA_output.tsv", qc = TRUE)
+pristinesra(metadata = "metadata.xlsx")
 ```
 ## Output
 
@@ -60,24 +56,30 @@ dwca_out/
   ├─ eml.xml
   ├─ meta.xml
   └─ project_dwca.zip
+  ├─ qc_summary_occurrence.txt
+  ├─ qc_summary_dnaderiveddata.txt
+
 
 sra_out/
   ├─ BioSample.tsv
   ├─ SRAmetadata.tsv
-  └─ SRA_Submission.xml
 ```
 
 ## Input
 
 1) metadata.xlsx (pristinedna, pristinesra)
   - Project/Events sheet (project-level + event-level)
-    - Recommended: ps_sample_id (join key), expedition, depth_m,
-    decimalLatitude, decimalLongitude, country, env_broad_scale, env_medium.
+    - Minimum required columns: ps_sample_id (join key), date, lat, long,
+    collection_time, country, env_broad_scale, env_medium.
   - Samples sheet (sample-level)
-    - Recommended: ps_sample_id (join key), lib_layout, seq_meth, marker.
+    - Minimum required columns: ps_sample_id (join key)
+    - Will prompt for additional required data if blank
+  - Specific output may require additional columns
 
 2) eDNA_data.tsv (pristinedna)
-  - ps_sample_id column names (to link to metadata)
-  - asv / zotu (sequence unit ID)
-  - genus and species (assigned taxon)
-  - readCount (abundance proxy)
+  - Minimum required columns: ps_sample_id column names (to link to metadata),
+  minimum of 1 taxonomic idenitifying unit (no taxa OTUs will be dropped), pid
+  (percent identity to assigned taxa)
+  - OTU (sequence unit ID)
+  - genus and species
+  - read counts per sample-OTU

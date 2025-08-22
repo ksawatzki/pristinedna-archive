@@ -1,11 +1,11 @@
 Package: PristineDNA
 Type: Package
 Title: Process eDNA Data for Occurrence and DNA-Derived Data Submission
-Version: 0.1.1
+Version: 0.1.3
 Authors@R: person("Kaitlin Sawatzki", email = "ksawatzki@gmail.com", role = "cre")
-Description: This package processes environmental DNA (eDNA) data and formats it for submission to OBIS and GBIF.
+Description: This package processes environmental DNA (eDNA) data and formats it for submission to OBIS/GBIF and NCBI.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.1.2
-Imports: dplyr, utils, countrycode, measurements, readxl, readr, stringr, Biostrings, reshape2, purrr, XML, zip, magrittr
+Imports: dplyr, utils, countrycode, measurements, readxl, readr, stringr, Biostrings, reshape2, purrr, XML, zip, magrittr, lubridate, obistools, Hmisc, tidyr

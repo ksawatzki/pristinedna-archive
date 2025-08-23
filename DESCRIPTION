@@ -7,7 +7,7 @@ Authors@R: c(
            email = "ksawatzki@gmail.com", 
            role = c("aut", "cre"))
 )
-Description: This package processes environmental DNA (eDNA) data and formats it for submission to OBIS/GBIF and NCBI.
+Description: This package processes environmental DNA (eDNA) data and formats it for submission to OBIS/GBIF and NCBI/SRA.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true

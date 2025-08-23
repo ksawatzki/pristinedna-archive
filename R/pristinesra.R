@@ -4,7 +4,7 @@
 #' a BioSample table tailored to MIMS/MIMAG/MIMARKS and an SRAmetadata
 #' table that captures library details and FASTQ mapping.
 #'
-#' The function expects your original Pristine Seas Excel workbook with
+#' The function expects your Pristine Seas Excel workbook with
 #' `metadata` and `labwork` sheets. You can pass a FASTQ manifest (data.frame
 #' or path to CSV/TSV) with columns like `sample_name`, `fastq_1`, `fastq_2`.
 #'

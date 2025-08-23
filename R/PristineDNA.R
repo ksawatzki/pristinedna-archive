@@ -1,5 +1,4 @@
-# Helpers (not exported)
-
+# Set up
 # function to convert latitude and longitude to decimal degrees flexibly
 convert_to_decimal <- function(x) {
   vapply(x, FUN.VALUE = numeric(1), function(coord) {

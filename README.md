@@ -1,4 +1,5 @@
-# PristineDNA
+# PristineDNA ARCHIVE
+Maintained at https://github.com/pristine-seas/PristineDNA
 
 An R package to standardize environmental DNA (eDNA) outputs and package them for submission to **OBIS/GBIF** (Darwin Core Archive, DwC-A) and **NCBI SRA** from the same project metadata.
 The package follows Pristine Seas metadata conventions and MIxS/MIMARKS-style fields.
